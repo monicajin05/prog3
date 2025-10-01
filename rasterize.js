@@ -4,7 +4,7 @@
 const WIN_Z = 0;  // default graphics window z coord in world space
 const WIN_LEFT = 0; const WIN_RIGHT = 1;  // default left and right x coords in world space
 const WIN_BOTTOM = 0; const WIN_TOP = 1;  // default top and bottom y coords in world space
-const INPUT_TRIANGLES_URL = "https://ncsucgclass.github.io/prog3/triangles.json"; // triangles file loc
+const INPUT_TRIANGLES_URL = "triangles.json"; // triangles file loc
 const INPUT_ELLIPSOIDS_URL = "https://ncsucgclass.github.io/prog3/ellipsoids.json";
 //const INPUT_SPHERES_URL = "https://ncsucgclass.github.io/prog3/spheres.json"; // spheres file loc
 var Eye = new vec4.fromValues(0.5,0.5,-0.5,1.0); // default eye position in world space
@@ -79,19 +79,44 @@ function loadTriangles() {
         var whichSetTri; // index of triangle in current triangle set
         var coordArray = []; // 1D array of vertex coords for WebGL
         
+        var indexArray = []; // 1D array of vertex indices for WebGL
+        // vertex offset is used to number vertices across multiple sets
+        var vertexOffset = 0;
+        var colorArray = [];
+        
         for (var whichSet=0; whichSet<inputTriangles.length; whichSet++) {
             
             // set up the vertex coord array
             for (whichSetVert=0; whichSetVert<inputTriangles[whichSet].vertices.length; whichSetVert++){
                 coordArray = coordArray.concat(inputTriangles[whichSet].vertices[whichSetVert]);
+                colorArray = colorArray.concat(inputTriangles[whichSet].material.diffuse);
                 // console.log(inputTriangles[whichSet].vertices[whichSetVert]);
             }
+            // set up the triangle index array, adjusting indices across sets
+            for (whichSetTri=0; whichSetTri<inputTriangles[whichSet].triangles.length; whichSetTri++){
+                var triIndex = inputTriangles[whichSet].triangles[whichSetTri];
+                indexArray = indexArray.concat(triIndex.map(index => index + vertexOffset));
+            }
+            // update the vertex offset for the next triangle set
+            vertexOffset += inputTriangles[whichSet].vertices.length;
         } // end for each triangle set 
         // console.log(coordArray.length);
         // send the vertex coords to webGL
         vertexBuffer = gl.createBuffer(); // init empty vertex coord buffer
         gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffer); // activate that buffer
         gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(coordArray),gl.STATIC_DRAW); // coords to that buffer
+
+        // send the triangle indices to webGL
+        triangleBuffer = gl.createBuffer(); // init empty triangle index buffer
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,triangleBuffer); // activate that buffer
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(indexArray),gl.STATIC_DRAW);
+
+        // Send the vertex colors to webGL
+        colorBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colorArray), gl.STATIC_DRAW);
+
+        triBufferSize = indexArray.length;
         
     } // end if triangles found
 } // end load triangles
@@ -101,17 +126,25 @@ function setupShaders() {
     
     // define fragment shader in essl using es6 template strings
     var fShaderCode = `
+        precision mediump float;
+        // Added varying vector
+        varying vec3 fragmentColor;
+
         void main(void) {
-            gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0); // all fragments are white
+            gl_FragColor = vec4(fragmentColor, 1.0); // all fragments are white
         }
     `;
     
     // define vertex shader in essl using es6 template strings
     var vShaderCode = `
         attribute vec3 vertexPosition;
+        // added vertex color
+        attribute vec3 vertexColor;
         uniform bool altPosition;
+        varying vec3 fragmentColor;
 
         void main(void) {
+            fragmentColor = vertexColor;
             if(altPosition)
                 gl_Position = vec4(vertexPosition + vec3(-1.0, -1.0, 0.0), 1.0); // use the altered position
             else
@@ -149,6 +182,8 @@ function setupShaders() {
                 vertexPositionAttrib = // get pointer to vertex shader input
                     gl.getAttribLocation(shaderProgram, "vertexPosition"); 
                 gl.enableVertexAttribArray(vertexPositionAttrib); // input to shader from array
+                vertexColorAttrib = gl.getAttribLocation(shaderProgram, "vertexColor"); // NEW
+                gl.enableVertexAttribArray(vertexColorAttrib);
                 altPositionUniform = // get pointer to altPosition flag
                     gl.getUniformLocation(shaderProgram, "altPosition");
             } // end if no shader program link errors
@@ -167,16 +202,24 @@ function setupShaders() {
 var bgColor = 0;
 // render the loaded model
 function renderTriangles() {
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); // clear frame/depth buffers
     bgColor = (bgColor < 1) ? (bgColor + 0.001) : 0;
     gl.clearColor(bgColor, 0, 0, 1.0);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); // clear frame/depth buffers
+
     requestAnimationFrame(renderTriangles);
     // vertex buffer: activate and feed into vertex shader
     gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffer); // activate
     gl.vertexAttribPointer(vertexPositionAttrib,3,gl.FLOAT,false,0,0); // feed
     gl.uniform1i(altPositionUniform, altPosition); // feed
 
-    gl.drawArrays(gl.TRIANGLES,0,3); // render
+    // Using color buffer
+    gl.bindBuffer(gl.ARRAY_BUFFER,colorBuffer); // activate
+    gl.vertexAttribPointer(vertexColorAttrib,3,gl.FLOAT,false,0,0); // feed
+
+    // gl.drawArrays(gl.TRIANGLES,0,3); // render
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,triangleBuffer);
+    // Use drawElements
+    gl.drawElements(gl.TRIANGLES,triBufferSize,gl.UNSIGNED_SHORT, 0); // render
 } // end render triangles
 
 
