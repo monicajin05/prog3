@@ -17,6 +17,7 @@ var triBufferSize; // the number of indices in the triangle buffer
 var altPosition; // flag indicating whether to alter vertex positions
 var vertexPositionAttrib; // where to put position for vertex shader
 var altPositionUniform; // where to put altPosition flag for vertex shader
+var inputTriangles = getJSONFile(INPUT_TRIANGLES_URL,"triangles");
 
 
 // ASSIGNMENT HELPER FUNCTIONS
@@ -73,7 +74,7 @@ function setupWebGL() {
 
 // read triangles in, load them into webgl buffers
 function loadTriangles() {
-    var inputTriangles = getJSONFile(INPUT_TRIANGLES_URL,"triangles");
+    
     if (inputTriangles != String.null) { 
         var whichSetVert; // index of vertex in current triangle set
         var whichSetTri; // index of triangle in current triangle set
@@ -127,11 +128,40 @@ function setupShaders() {
     // define fragment shader in essl using es6 template strings
     var fShaderCode = `
         precision mediump float;
-        // Added varying vector
-        varying vec3 fragmentColor;
+        //varying vec3 fragmentColor;
+
+        varying vec3 fragPosition;
+        varying vec3 fragNormal;
+
+        uniform vec3 lightPosition;
+        uniform vec3 eye;
+
+        uniform vec3 ambient;
+        uniform vec3 diffuse;
+        uniform vec3 specular;
+        uniform float shininess;
 
         void main(void) {
-            gl_FragColor = vec4(fragmentColor, 1.0); 
+            vec3 N = normalize(fragNormal);
+            vec3 L = normalize(lightPosition - fragPosition);
+            vec3 V = normalize(eye - fragPosition);
+            vec3 H = normalize(L + V);
+
+            //ambient
+            vec3 amb = ambient;
+            
+            //diffuse
+            vec3 diff1 = max(dot(N, L), 0.0);
+            vec3 diff = diffuse * diff1;
+
+            //specular
+            float spec1 = pow(max(dot(N, H), 0.0), shininess);
+            vec3 spec = specular * spec1;
+
+            vec3 color = amb + diff + spec;
+
+            //gl_FragColor = vec4(fragmentColor, 1.0); 
+            gl_FragColor = vec4(color, 1.0); 
         }
     `;
     
@@ -142,20 +172,43 @@ function setupShaders() {
     var vShaderCode = `
     
         attribute vec3 vertexPosition;
-        // added vertex color
-        attribute vec3 vertexColor;
+        attribute vec3 vertexNormal;
+
+        uniform mat4 model;
+        uniform mat4 view;
+        uniform mat4 projection;
+
+        varying vec3 fragPosition;
+        varying vec3 fragNormal;
+        varying vec3 fragPosition;
+        varying vec3 fragNormal;
+
         uniform bool altPosition;
-        varying vec3 fragmentColor;
+
+        // added vertex color
+        //attribute vec3 vertexColor;
+        
+        //varying vec3 fragmentColor;
         // uniform mat4 uMVP;
 
-        void main(void) {
-            fragmentColor = vertexColor;
-            if(altPosition)
-                gl_Position = vec4(vertexPosition + vec3(-1.0, -1.0, 0.0), 1.0); // use the altered position
-                // gl_Position = uMVP * vec4(vertexPosition + vec3(-1.0, -1.0, 0.0), 1.0); // use the altered position
-            else
-                gl_Position = vec4(vertexPosition, 1.0); // use the untransformed position
-                // gl_Position = uMVP * vec4(vertexPosition, 1.0); // use the untransformed position
+        // void main(void) {
+        //     //fragmentColor = vertexColor;
+        //     if(altPosition)
+        //         gl_Position = vec4(vertexPosition + vec3(-1.0, -1.0, 0.0), 1.0); // use the altered position
+        //         // gl_Position = uMVP * vec4(vertexPosition + vec3(-1.0, -1.0, 0.0), 1.0); // use the altered position
+        //     else
+        //         gl_Position = vec4(vertexPosition, 1.0); // use the untransformed position
+        //         // gl_Position = uMVP * vec4(vertexPosition, 1.0); // use the untransformed position
+        // }
+
+        void main (void){
+            vec4 pos = vec4(vertexPosition, 1.0);
+            if (altPosition){
+                pos = vec4(vertexPosition + vec3(-1.0, -1.0, 0.0), 1.0);
+            }
+            vec4 worldPosition = model * pos;
+            fragPosition = normalize(mat3(model) * vertexNormal);
+            gl_Position = projection * view * worldPosition;
         }
     `;
     
@@ -189,10 +242,38 @@ function setupShaders() {
                 vertexPositionAttrib = // get pointer to vertex shader input
                     gl.getAttribLocation(shaderProgram, "vertexPosition"); 
                 gl.enableVertexAttribArray(vertexPositionAttrib); // input to shader from array
-                vertexColorAttrib = gl.getAttribLocation(shaderProgram, "vertexColor"); // NEW
-                gl.enableVertexAttribArray(vertexColorAttrib);
+                // vertexColorAttrib = gl.getAttribLocation(shaderProgram, "vertexColor"); // NEW
+                // gl.enableVertexAttribArray(vertexColorAttrib);
                 altPositionUniform = // get pointer to altPosition flag
                     gl.getUniformLocation(shaderProgram, "altPosition");
+
+                //Added code for blinn-phong.
+                vertexNormalAttrib =
+                    gl.getAttribLocation(shaderProgram, "vertexNormal");
+                gl.enableVertexAttribArray(vertexNormalAttrib);
+                
+                altPositionUniform = gl.getUniformLocation(shaderProgram, "altPosition");
+                
+                // Attributes
+                shaderProgram.aVertexPosition = gl.getAttribLocation(shaderProgram, "vertexPosition");
+                shaderProgram.aVertexNormal   = gl.getAttribLocation(shaderProgram, "vertexNormal");
+
+                // Uniforms for transformations
+                shaderProgram.uModel      = gl.getUniformLocation(shaderProgram, "model");
+                shaderProgram.uView       = gl.getUniformLocation(shaderProgram, "view");
+                shaderProgram.uProjection = gl.getUniformLocation(shaderProgram, "projection");
+
+                // Uniforms for lighting
+                shaderProgram.uLightPos   = gl.getUniformLocation(shaderProgram, "lightPosition");
+                shaderProgram.uEye        = gl.getUniformLocation(shaderProgram, "eye");
+
+                // Uniforms for material properties
+                shaderProgram.uAmbient    = gl.getUniformLocation(shaderProgram, "ambient");
+                shaderProgram.uDiffuse    = gl.getUniformLocation(shaderProgram, "diffuse");
+                shaderProgram.uSpecular   = gl.getUniformLocation(shaderProgram, "specular");
+                shaderProgram.uShininess  = gl.getUniformLocation(shaderProgram, "shininess");
+
+                return shaderProgram;
             } // end if no shader program link errors
         } // end if no compile errors
     } // end try 
@@ -246,17 +327,18 @@ function pressKey(event) {
     if (key == 'a') {
         vec3.scaleAndAdd(Eye, Eye, right, -0.05);
     }
-}
+} 
+
 
 window.addEventListener('keydown', pressKey);
 
 /* MAIN -- HERE is where execution begins after window load */
 
 function main() {
-  
   setupWebGL(); // set up the webGL environment
   loadTriangles(); // load in the triangles from tri file
   setupShaders(); // setup the webGL shaders
   renderTriangles(); // draw the triangles using webGL
+  
   
 } // end main
