@@ -78,7 +78,7 @@ function loadTriangles() {
         var whichSetVert; // index of vertex in current triangle set
         var whichSetTri; // index of triangle in current triangle set
         var coordArray = []; // 1D array of vertex coords for WebGL
-        
+
         var indexArray = []; // 1D array of vertex indices for WebGL
         // vertex offset is used to number vertices across multiple sets
         var vertexOffset = 0;
@@ -131,24 +131,31 @@ function setupShaders() {
         varying vec3 fragmentColor;
 
         void main(void) {
-            gl_FragColor = vec4(fragmentColor, 1.0); // all fragments are white
+            gl_FragColor = vec4(fragmentColor, 1.0); 
         }
     `;
     
+    // modeling, viewing, projection matrices
+    // projection lecture and slides
+
     // define vertex shader in essl using es6 template strings
     var vShaderCode = `
+    
         attribute vec3 vertexPosition;
         // added vertex color
         attribute vec3 vertexColor;
         uniform bool altPosition;
         varying vec3 fragmentColor;
+        // uniform mat4 uMVP;
 
         void main(void) {
             fragmentColor = vertexColor;
             if(altPosition)
                 gl_Position = vec4(vertexPosition + vec3(-1.0, -1.0, 0.0), 1.0); // use the altered position
+                // gl_Position = uMVP * vec4(vertexPosition + vec3(-1.0, -1.0, 0.0), 1.0); // use the altered position
             else
                 gl_Position = vec4(vertexPosition, 1.0); // use the untransformed position
+                // gl_Position = uMVP * vec4(vertexPosition, 1.0); // use the untransformed position
         }
     `;
     
@@ -206,6 +213,12 @@ function renderTriangles() {
     gl.clearColor(bgColor, 0, 0, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); // clear frame/depth buffers
 
+    // const { forward } = getCameraAxes();
+    // const Center = vec3.create();
+    // mat4.lookAt(view, Eye, Center, vec3.fromValues(0,1,0));
+    // add a little of the cross product vector for transforms
+    // tilt the up vector up a bit for rotations
+
     requestAnimationFrame(renderTriangles);
     // vertex buffer: activate and feed into vertex shader
     gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffer); // activate
@@ -222,6 +235,20 @@ function renderTriangles() {
     gl.drawElements(gl.TRIANGLES,triBufferSize,gl.UNSIGNED_SHORT, 0); // render
 } // end render triangles
 
+function pressKey(event) {
+    const key = event.key;
+    const {forward, right, up} = getCameraAxes();
+
+    // glMatrix
+    // pass result into shader
+    // Add increments to the eye position
+    // every time press a, eye would move to the left
+    if (key == 'a') {
+        vec3.scaleAndAdd(Eye, Eye, right, -0.05);
+    }
+}
+
+window.addEventListener('keydown', pressKey);
 
 /* MAIN -- HERE is where execution begins after window load */
 
