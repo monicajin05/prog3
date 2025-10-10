@@ -20,6 +20,7 @@ var altPositionUniform; // where to put altPosition flag for vertex shader
 var inputTriangles = getJSONFile(INPUT_TRIANGLES_URL,"triangles");
 var normalBuffer;
 var vertexNormalAttrib;
+var shaderProgram; // create the single shader program
 
 // ASSIGNMENT HELPER FUNCTIONS
 
@@ -80,20 +81,17 @@ function loadTriangles() {
         var whichSetVert; // index of vertex in current triangle set
         var whichSetTri; // index of triangle in current triangle set
         var coordArray = []; // 1D array of vertex coords for WebGL
-
+        var normalArray = []; // 1D array of the normals of the triangles.
         var indexArray = []; // 1D array of vertex indices for WebGL
         // vertex offset is used to number vertices across multiple sets
         var vertexOffset = 0;
-        var colorArray = [];
-        var normalArray = [];
         
         for (var whichSet=0; whichSet<inputTriangles.length; whichSet++) {
             
-            // set up the vertex coord array
+            // set up the vertex coord array and the normals array.
             for (whichSetVert=0; whichSetVert<inputTriangles[whichSet].vertices.length; whichSetVert++){
                 coordArray = coordArray.concat(inputTriangles[whichSet].vertices[whichSetVert]);
                 normalArray = normalArray.concat(inputTriangles[whichSet].normals[whichSetVert]);
-                // console.log(inputTriangles[whichSet].vertices[whichSetVert]);
             }
             // set up the triangle index array, adjusting indices across sets
             for (whichSetTri=0; whichSetTri<inputTriangles[whichSet].triangles.length; whichSetTri++){
@@ -103,7 +101,7 @@ function loadTriangles() {
             // update the vertex offset for the next triangle set
             vertexOffset += inputTriangles[whichSet].vertices.length;
         } // end for each triangle set 
-        // console.log(coordArray.length);
+
         // send the vertex coords to webGL
         vertexBuffer = gl.createBuffer(); // init empty vertex coord buffer
         gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffer); // activate that buffer
@@ -114,11 +112,7 @@ function loadTriangles() {
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,triangleBuffer); // activate that buffer
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(indexArray),gl.STATIC_DRAW);
 
-        // Send the vertex colors to webGL
-        // colorBuffer = gl.createBuffer();
-        // gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-        // gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colorArray), gl.STATIC_DRAW);
-
+        // send the normal buffer to webGL
         normalBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(normalArray), gl.STATIC_DRAW);
@@ -128,113 +122,9 @@ function loadTriangles() {
     } // end if triangles found
 } // end load triangles
 
-// // setup the webGL shaders
-// function setupShaders() {
-    
-//     // define fragment shader in essl using es6 template strings
-//     var fShaderCode = `
-//         //Sets the precision level for floating-point numbers.
-//         precision mediump float; 
-//         //Declares a varying variable that will reveice interpolated color data from the vertex shader.
-//         varying vec3 fragmentColor;
-//         //Runs once per pixel. Sets the final pixel color based on the vertex color sent from the vertex shader.
-//         void main(void) {
-//             gl_FragColor = vec4(fragmentColor, 1.0); // all fragments are white
-//         }
-//     `;
-    
-//     // define vertex shader in essl using es6 template strings
-//     //Sets the position of the vertex and gives info to the fragment shader about the color of the vertex.
-//     var vShaderCode = `
-//         //Input variable for the vertex's 3D position.
-//         attribute vec3 vertexPosition;
-//         uniform bool altPosition;
-//         //Vertex's color.
-//         attribute vec3 vertexColor;
-//         //Passes color data from vertex shader to fragment shader.
-//         varying vec3 fragmentColor;
-
-//         void main(void) {
-//             //Passes color data from vertex shader to fragment shader.
-//             fragmentColor = vertexColor;
-//             //Sets the position of the vertex and moves it around.
-//             if(altPosition)
-//                 gl_Position = vec4(vertexPosition + vec3(-1.0, -1.0, 0.0), 1.0); // use the altered position
-//             else
-//                 gl_Position = vec4(vertexPosition, 1.0); // use the untransformed position
-//         }
-//     `;
-    
-//     try {
-//         // console.log("fragment shader: "+fShaderCode);
-//         //Creates a new fragment shader object, attaches the shader code, and compiles it so the GPU can execute.
-//         var fShader = gl.createShader(gl.FRAGMENT_SHADER); // create frag shader
-//         gl.shaderSource(fShader,fShaderCode); // attach code to shader
-//         gl.compileShader(fShader); // compile the code for gpu execution
-
-//         // console.log("vertex shader: "+vShaderCode);
-//         //Creates a new vertex shader object, attaches the shader code, and compiles it so the GPU can execute.
-//         var vShader = gl.createShader(gl.VERTEX_SHADER); // create vertex shader
-//         gl.shaderSource(vShader,vShaderCode); // attach code to shader
-//         gl.compileShader(vShader); // compile the code for gpu execution
-        
-//         //Error checking if the fragment and vertex shaders compiled correctly.
-//         if (!gl.getShaderParameter(fShader, gl.COMPILE_STATUS)) { // bad frag shader compile
-//             throw "error during fragment shader compile: " + gl.getShaderInfoLog(fShader);  
-//             gl.deleteShader(fShader);
-//         } else if (!gl.getShaderParameter(vShader, gl.COMPILE_STATUS)) { // bad vertex shader compile
-//             throw "error during vertex shader compile: " + gl.getShaderInfoLog(vShader);  
-//             gl.deleteShader(vShader);
-
-//         //If no compile errors, go on.
-//         } else { 
-//             //Shader program combines the vertex and gragment shaders into a single executable.
-//             var shaderProgram = gl.createProgram(); // create the single shader program
-//             gl.attachShader(shaderProgram, fShader); // put frag shader in program
-//             gl.attachShader(shaderProgram, vShader); // put vertex shader in program
-//             gl.linkProgram(shaderProgram); // link program into gl context
-
-//             //Check that the shader program linking was successful.
-//             if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) { // bad program link
-//                 throw "error during shader program linking: " + gl.getProgramInfoLog(shaderProgram);
-            
-//             //If no shader program link errors, go on.
-//             } else { 
-//                 //Tell WebGL to use the shaderProgram for all future calls/activate it.
-//                 gl.useProgram(shaderProgram); // activate shader program (frag and vert)
-                
-//                 //Finds where the vertexPosition variable lives in the GPU program and enables it so data from vertex buffer can be fed into it.
-//                 vertexPositionAttrib = // get pointer to vertex shader input
-//                     gl.getAttribLocation(shaderProgram, "vertexPosition"); 
-//                 gl.enableVertexAttribArray(vertexPositionAttrib); // input to shader from array
-                
-//                 //Finds the variable altPosition in the shader so it can be toggled later.
-//                 altPositionUniform = // get pointer to altPosition flag
-//                     gl.getUniformLocation(shaderProgram, "altPosition");
-                
-//                 //Finds where vertexColor variable lives in the GPU program and enables it so data from vertex buffer can be fed into it.
-//                 vertexColorAttrib = gl.getAttribLocation(shaderProgram, "vertexColor");
-//                 gl.enableVertexAttribArray(vertexColorAttrib);
-//             } // end if no shader program link errors
-//         } // end if no compile errors
-//     } // end try 
-
-//     catch(e) {
-//         console.log(e);
-//     } // end catch
-//     altPosition = false;
-//     setTimeout(function alterPosition() {
-//         altPosition = !altPosition;
-//         setTimeout(alterPosition, 2000);
-//     }, 2000); // switch flag value every 2 seconds
-// } // end setup shaders
-
-var shaderProgram; // create the single shader program
-
 // setup the webGL shaders
 function setupShaders() {
     
-    // define fragment shader in essl using es6 template strings
     var fShaderCode = `
         precision mediump float;
 
@@ -272,7 +162,6 @@ function setupShaders() {
         }
     `;
 
-    // define vertex shader in essl using es6 template strings
     var vShaderCode = `
     
         attribute vec3 vertexPosition;
@@ -293,9 +182,13 @@ function setupShaders() {
             if (altPosition){
                 pos = vec4(vertexPosition + vec3(-1.0, -1.0, 0.0), 1.0);
             }
+            //pos is the position of the vertex in model space. The model matrix transforms the vertex into world space (in order to do translation, rotation, scale).
+            //worldPosition is like where in the world/space is this vertex.
             vec4 worldPosition = model * pos;
             fragPosition = worldPosition.xyz;
+            //normal matrix is the 3x3 version of the model matrix. Transforms vertex's normal into the world space.
             fragNormal = normalize(normal * vertexNormal);
+            //View transforms from world space and projection transforms from view space. So, this moves the vertex into view and projects it.
             gl_Position = projection * view * worldPosition;
         }
     `;
@@ -325,21 +218,24 @@ function setupShaders() {
 
             if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) { // bad program link
                 throw "error during shader program linking: " + gl.getProgramInfoLog(shaderProgram);
-            } else { // no shader program link errors
-                gl.useProgram(shaderProgram); // activate shader program (frag and vert)
-                vertexPositionAttrib = // get pointer to vertex shader input
-                    gl.getAttribLocation(shaderProgram, "vertexPosition"); 
-                gl.enableVertexAttribArray(vertexPositionAttrib); // input to shader from array
-                // vertexColorAttrib = gl.getAttribLocation(shaderProgram, "vertexColor"); // NEW
-                // gl.enableVertexAttribArray(vertexColorAttrib);
-                altPositionUniform = // get pointer to altPosition flag
-                    gl.getUniformLocation(shaderProgram, "altPosition");
+            
+            // no shader program link errors
+            } else { 
+                // activate shader program (frag and vert)
+                gl.useProgram(shaderProgram); 
 
-                //Added code for blinn-phong.
-                vertexNormalAttrib =
-                    gl.getAttribLocation(shaderProgram, "vertexNormal");
+                // get pointer to vertex shader input
+                vertexPositionAttrib = gl.getAttribLocation(shaderProgram, "vertexPosition"); 
+                gl.enableVertexAttribArray(vertexPositionAttrib); // input to shader from array
+                
+                // get pointer to altPosition flag
+                altPositionUniform = gl.getUniformLocation(shaderProgram, "altPosition");
+
+                // get pointer to vertex normal
+                vertexNormalAttrib = gl.getAttribLocation(shaderProgram, "vertexNormal");
                 gl.enableVertexAttribArray(vertexNormalAttrib);
                
+                // set all the fields that are used in the shaders.
                 gl.uniform3f(gl.getUniformLocation(shaderProgram, "lightPosition"), -0.5, 1.5, -0.5);
                 gl.uniform3f(gl.getUniformLocation(shaderProgram, "eye"), 0.5, 0.5, -0.5);
 
@@ -376,29 +272,25 @@ function setupShaders() {
 } // end setup shaders
 
 var bgColor = 0;
+
 // render the loaded model
 function renderTriangles() {
     bgColor = (bgColor < 1) ? (bgColor + 0.001) : 0;
     gl.clearColor(bgColor, 0, 0, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); // clear frame/depth buffers
-    //gl.enable(gl.DEPTH_TEST);
 
     requestAnimationFrame(renderTriangles);
+
     // vertex buffer: activate and feed into vertex shader
     gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffer); // activate
     gl.vertexAttribPointer(vertexPositionAttrib,3,gl.FLOAT,false,0,0); // feed
     gl.uniform1i(altPositionUniform, altPosition); // feed
 
-    // Using color buffer
-    // gl.bindBuffer(gl.ARRAY_BUFFER,colorBuffer); // activate
-    // gl.vertexAttribPointer(vertexColorAttrib,3,gl.FLOAT,false,0,0); // feed
-
+    // normal buffer: activate and feed into vertex shader
     gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
     gl.vertexAttribPointer(vertexNormalAttrib, 3, gl.FLOAT, false, 0, 0);
-    
-    // gl.drawArrays(gl.TRIANGLES,0,3); // render
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,triangleBuffer);
 
+    //Get the ambient, diffuse, specular, and n from the input files for all of the triangles.
     var offset = 0;
     for (let whichSet = 0; whichSet < inputTriangles.length; whichSet++){
         var material = inputTriangles[whichSet].material;
