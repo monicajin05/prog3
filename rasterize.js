@@ -4,10 +4,12 @@
 const WIN_Z = 0;  // default graphics window z coord in world space
 const WIN_LEFT = 0; const WIN_RIGHT = 1;  // default left and right x coords in world space
 const WIN_BOTTOM = 0; const WIN_TOP = 1;  // default top and bottom y coords in world space
-const INPUT_TRIANGLES_URL = "triangles.json"; // triangles file loc
+const INPUT_TRIANGLES_URL = "triangles2.json"; // triangles file loc
 const INPUT_ELLIPSOIDS_URL = "https://ncsucgclass.github.io/prog3/ellipsoids.json";
 //const INPUT_SPHERES_URL = "https://ncsucgclass.github.io/prog3/spheres.json"; // spheres file loc
 var Eye = new vec4.fromValues(0.5,0.5,-0.5,1.0); // default eye position in world space
+var LookAt = new vec4.fromValues(0.5, 0.5, 0.5);
+var Up = new vec4.fromValues(0, 1, 0);
 
 /* webgl globals */
 var gl = null; // the all powerful gl object. It's all here folks!
@@ -238,23 +240,6 @@ function setupShaders() {
                 // set all the fields that are used in the shaders.
                 gl.uniform3f(gl.getUniformLocation(shaderProgram, "lightPosition"), -0.5, 1.5, -0.5);
                 gl.uniform3f(gl.getUniformLocation(shaderProgram, "eye"), 0.5, 0.5, -0.5);
-
-                var model = mat4.create();
-                var view = mat4.create();
-                var projection = mat4.create();
-                var normalMatrix = mat3.create();
-
-                mat4.lookAt(view, [0.5, 0.5, -0.5], [0.5, 0.5, 0.5], [0, 1, 0]);
-                mat3.normalFromMat4(normalMatrix, model);
-
-                mat4.perspective(
-                    projection, Math.PI/4, gl.canvas.width / gl.canvas.height, 0.1, 10.0
-                );
-
-                gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "model"), false, model);
-                gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "view"), false, view);
-                gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "projection"), false, projection);
-                gl.uniformMatrix3fv(gl.getUniformLocation(shaderProgram, "normal"), false, normalMatrix);
                 
                 return shaderProgram;
             } // end if no shader program link errors
@@ -290,12 +275,44 @@ function renderTriangles() {
     gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
     gl.vertexAttribPointer(vertexNormalAttrib, 3, gl.FLOAT, false, 0, 0);
 
+    var model = mat4.create();
+    var view = mat4.create();
+    var projection = mat4.create();
+    var normalMatrix = mat3.create();
+    mat4.lookAt(view, Eye, LookAt, Up);
+    //mat3.normalFromMat4(normalMatrix, model);
+    mat4.perspective(
+        projection, 1, gl.canvas.width / gl.canvas.height, 0.1, 10.0
+    );
+
     //Get the ambient, diffuse, specular, and n from the input files for all of the triangles.
     var offset = 0;
     for (let whichSet = 0; whichSet < inputTriangles.length; whichSet++){
         var material = inputTriangles[whichSet].material;
         var indices = inputTriangles[whichSet].triangles.length * 3;
+
+        let model = mat4.create();
+        if (whichSet === index && selected){
+            const triangle = inputTriangles[whichSet];
+            const vertices = triangle.vertices;
+
+            // Find the center of the triangle.
+            const cx = (vertices[0][0] + vertices[1][0] + vertices[2][0]) / 3;
+            const cy = (vertices[0][1] + vertices[1][1] + vertices[2][1]) / 3;
+            const cz = (vertices[0][2] + vertices[1][2] + vertices[2][2]) / 3;
+            const center = [cx, cy, cz];
+
+            // Scale around its center
+            mat4.translate(model, model, center); //Move triangle to origin.
+            mat4.scale(model, model, [1.2, 1.2, 1.2]); //Scale triangle
+            mat4.translate(model, model, [-center[0], -center[1], -center[2]]); // move back
+        }
         
+        gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "model"), false, model);
+        gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "view"), false, view);
+        gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "projection"), false, projection);
+        gl.uniformMatrix3fv(gl.getUniformLocation(shaderProgram, "normal"), false, normalMatrix);
+    
         //Sends a vec3 to the GPU shader. So it pretty much assigns the value from the triangles file into the field that is defined in the shader, so that the shader can use that field to generate the light and colors.
         gl.uniform3fv(gl.getUniformLocation(shaderProgram, "ambient"), new Float32Array(material.ambient));
         gl.uniform3fv(gl.getUniformLocation(shaderProgram, "diffuse"), new Float32Array(material.diffuse));
@@ -308,21 +325,82 @@ function renderTriangles() {
     }
 } // end render triangles
 
-function pressKey(event) {
-    const key = event.key;
-    const {forward, right, up} = getCameraAxes();
+var index = 0;
+var selected = true;
 
-    // glMatrix
-    // pass result into shader
-    // Add increments to the eye position
-    // every time press a, eye would move to the left
-    if (key == 'a') {
-        vec3.scaleAndAdd(Eye, Eye, right, -0.05);
+document.addEventListener('keydown', (event) => {
+    const speed = 0.025; // how much to move per keypress
+
+    switch (event.key) {
+        case 'a': // move view left, scene right
+            Eye[0] += speed;
+            LookAt[0] += speed;
+            break;
+        case 'd': // move view right, scene left
+            Eye[0] -= speed;
+            LookAt[0] -= speed;
+            break;
+        case 'w': // move view forward, scene gets closer
+            Eye[2] += speed;
+            LookAt[2] += speed;
+            break;
+        case 's': // move view backward, scene gets further
+            Eye[2] -= speed;
+            LookAt[2] -= speed;
+            break;
+        case 'q': // move view up, scene goes down
+            Eye[1] += speed;
+            LookAt[1] += speed;
+            break;
+        case 'e': // move view down, scene goes up
+            Eye[1] -= speed;
+            LookAt[1] -= speed;
+            break;
+        case 'A': // rotate view left, scene rotates right
+            Eye[0] += speed;
+            Up[0] += speed;
+            break;
+        case 'D': // rotate view right, scene rotates left
+            Eye[0] -= speed;
+            Up[0] -= speed;
+            break;
+        case 'W': // rotate view forward, scene rotates down
+            Eye[1] += speed;
+            Up[1] += speed;
+            break;
+        case 'S': // rotate view backward, scene rotates up
+            Eye[1] -= speed;
+            Up[1] -= speed;
+            break;
+        case "ArrowRight":
+            index = (index + 1) % inputTriangles.length;
+            selected = true;
+            break;
+        case "ArrowLeft":
+            index = (index - 1 + inputTriangles.length) % inputTriangles.length;
+            selected = true;
+            break;
+        case " ":
+            selected = false;
+            break;
     }
-} 
 
+    updateViewMatrix();
+});
 
-window.addEventListener('keydown', pressKey);
+/** Updates the view matrix when buttons on keyboard are pressed. */
+function updateViewMatrix() {
+    const view = mat4.create();
+    mat4.lookAt(view, Eye, Center, Up);
+
+    // Send to shader
+    gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "view"), false, view);
+    gl.uniform3fv(gl.getUniformLocation(shaderProgram, "eye"), Eye);
+
+    // Redraw the scene
+    renderTriangles();
+}
+
 
 /* MAIN -- HERE is where execution begins after window load */
 
