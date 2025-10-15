@@ -19,7 +19,7 @@ var triBufferSize; // the number of indices in the triangle buffer
 var altPosition; // flag indicating whether to alter vertex positions
 var vertexPositionAttrib; // where to put position for vertex shader
 var altPositionUniform; // where to put altPosition flag for vertex shader
-var inputTriangles = getJSONFile(INPUT_TRIANGLES_URL,"triangles");
+var inputTriangles;
 var normalBuffer;
 var vertexNormalAttrib;
 var shaderProgram; // create the single shader program
@@ -77,7 +77,9 @@ function setupWebGL() {
 } // end setupWebGL
 
 // read triangles in, load them into webgl buffers
-function loadTriangles() {
+function loadTriangles(file_path) {
+    
+    inputTriangles = getJSONFile(file_path,"triangles");
     
     if (inputTriangles != String.null) { 
         var whichSetVert; // index of vertex in current triangle set
@@ -263,7 +265,7 @@ var bgColor = 0;
 
 // render the loaded model
 function renderTriangles() {
-    bgColor = (bgColor < 1) ? (bgColor + 0.001) : 0;
+    // bgColor = (bgColor < 1) ? (bgColor + 0.001) : 0;
     gl.clearColor(bgColor, 0, 0, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); // clear frame/depth buffers
 
@@ -295,7 +297,7 @@ function renderTriangles() {
         var material = inputTriangles[whichSet].material;
         var indices = inputTriangles[whichSet].triangles.length * 3;
 
-        model = mat4.create();
+        let model = mat4.create();
         if (whichSet === index && selected){
             const triangle = inputTriangles[whichSet];
             vertices = triangle.vertices;
@@ -338,53 +340,53 @@ function renderTriangles() {
 var index = 0;
 var selected = true;
 var vertices = null;
-var model;
+//var model;
 var rotation = []; // [x, y, z]
 
 
 document.addEventListener('keydown', (event) => {
-    const speed = 0.025; // how much to move per keypress
+    const speed = 0.05; // how much to move per keypress
 
     switch (event.key) {
         case 'a': // move view left, scene right
-            Eye[0] += speed;
-            LookAt[0] += speed;
+            Eye[0] += speed / 2;
+            LookAt[0] += speed / 2;
             break;
         case 'd': // move view right, scene left
-            Eye[0] -= speed;
-            LookAt[0] -= speed;
+            Eye[0] -= speed / 2;
+            LookAt[0] -= speed / 2;
             break;
         case 'w': // move view forward, scene gets closer
-            Eye[2] += speed;
-            LookAt[2] += speed;
+            Eye[2] += speed / 2;
+            LookAt[2] += speed / 2;
             break;
         case 's': // move view backward, scene gets further
-            Eye[2] -= speed;
-            LookAt[2] -= speed;
+            Eye[2] -= speed / 2;
+            LookAt[2] -= speed / 2;
             break;
         case 'q': // move view up, scene goes down
-            Eye[1] += speed;
-            LookAt[1] += speed;
+            Eye[1] += speed / 2;
+            LookAt[1] += speed / 2;
             break;
         case 'e': // move view down, scene goes up
-            Eye[1] -= speed;
-            LookAt[1] -= speed;
+            Eye[1] -= speed / 2;
+            LookAt[1] -= speed / 2;
             break;
         case 'A': // rotate view left, scene rotates right
             Eye[0] += speed;
-            Up[0] += speed;
+            //Up[0] += speed;
             break;
         case 'D': // rotate view right, scene rotates left
             Eye[0] -= speed;
-            Up[0] -= speed;
+            //Up[0] -= speed;
             break;
         case 'W': // rotate view forward, scene rotates down
             Eye[1] += speed;
-            Up[1] += speed;
+            //Up[1] += speed;
             break;
         case 'S': // rotate view backward, scene rotates up
             Eye[1] -= speed;
-            Up[1] -= speed;
+            //Up[1] -= speed;
             break;
         case "ArrowRight":
             index = (index + 1) % inputTriangles.length;
@@ -453,7 +455,7 @@ document.addEventListener('keydown', (event) => {
 /** Updates the view matrix when buttons on keyboard are pressed. */
 function updateViewMatrix() {
     const view = mat4.create();
-    mat4.lookAt(view, Eye, Center, Up);
+    mat4.lookAt(view, Eye, LookAt, Up);
 
     // Send to shader
     gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "view"), false, view);
@@ -463,14 +465,33 @@ function updateViewMatrix() {
     renderTriangles();
 }
 
+let currentView = 0;
+
+function render() {
+    if (currentView == 0) {
+        setupWebGL(); // set up the webGL environment
+        loadTriangles(INPUT_TRIANGLES_URL); // load in the triangles from tri file
+        setupShaders(); // setup the webGL shaders
+        renderTriangles(); // draw the triangles using webGL
+    } else {
+        setupWebGL(); // set up the webGL environment
+        loadTriangles(INPUT_ELLIPSOIDS_URL); // load in the triangles from tri file
+        setupShaders(); // setup the webGL shaders
+        renderTriangles(); // draw the triangles using webGL
+    }
+}
 
 /* MAIN -- HERE is where execution begins after window load */
 
 function main() {
-  setupWebGL(); // set up the webGL environment
-  loadTriangles(); // load in the triangles from tri file
-  setupShaders(); // setup the webGL shaders
-  renderTriangles(); // draw the triangles using webGL
+    render();
+
+    window.addEventListener("keydown", function(event) {
+        if (event.key == "!") {
+            currentView = (currentView + 1) % 2;
+            render();
+        }
+    });
   
   
 } // end main
