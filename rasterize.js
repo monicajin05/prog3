@@ -120,6 +120,9 @@ function loadTriangles() {
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(normalArray), gl.STATIC_DRAW);
         
         triBufferSize = indexArray.length;
+        for (let i = 0; i < inputTriangles.length; i++) {
+            inputTriangles[i].rotation = [0, 0, 0];
+        }
         
     } // end if triangles found
 } // end load triangles
@@ -285,16 +288,17 @@ function renderTriangles() {
         projection, 1, gl.canvas.width / gl.canvas.height, 0.1, 10.0
     );
 
+
     //Get the ambient, diffuse, specular, and n from the input files for all of the triangles.
     var offset = 0;
     for (let whichSet = 0; whichSet < inputTriangles.length; whichSet++){
         var material = inputTriangles[whichSet].material;
         var indices = inputTriangles[whichSet].triangles.length * 3;
 
-        let model = mat4.create();
+        model = mat4.create();
         if (whichSet === index && selected){
             const triangle = inputTriangles[whichSet];
-            const vertices = triangle.vertices;
+            vertices = triangle.vertices;
 
             // Find the center of the triangle.
             const cx = (vertices[0][0] + vertices[1][0] + vertices[2][0]) / 3;
@@ -304,6 +308,12 @@ function renderTriangles() {
 
             // Scale around its center
             mat4.translate(model, model, center); //Move triangle to origin.
+
+            // Apply rotation to triangle
+            mat4.rotateX(model, model, triangle.rotation[0]);
+            mat4.rotateY(model, model, triangle.rotation[1]);
+            mat4.rotateZ(model, model, triangle.rotation[2]);
+
             mat4.scale(model, model, [1.2, 1.2, 1.2]); //Scale triangle
             mat4.translate(model, model, [-center[0], -center[1], -center[2]]); // move back
         }
@@ -327,6 +337,10 @@ function renderTriangles() {
 
 var index = 0;
 var selected = true;
+var vertices = null;
+var model;
+var rotation = []; // [x, y, z]
+
 
 document.addEventListener('keydown', (event) => {
     const speed = 0.025; // how much to move per keypress
@@ -382,6 +396,54 @@ document.addEventListener('keydown', (event) => {
             break;
         case " ":
             selected = false;
+            break;
+        case "k":
+            vertices[0][0] -= speed;
+            vertices[1][0] -= speed;
+            vertices[2][0] -= speed;
+            break;
+        case ";":
+            vertices[0][0] += speed;
+            vertices[1][0] += speed;
+            vertices[2][0] += speed;
+            break;
+        case "o":
+            vertices[0][2] += speed;
+            vertices[1][2] += speed;
+            vertices[2][2] += speed;
+            break;
+        case "l":
+            vertices[0][2] -= speed;
+            vertices[1][2] -= speed;
+            vertices[2][2] -= speed;
+            break;  
+        case "i":
+            vertices[0][1] -= speed;
+            vertices[1][1] -= speed;
+            vertices[2][1] -= speed;
+            break;  
+        case "p":
+            vertices[0][1] += speed;
+            vertices[1][1] += speed;
+            vertices[2][1] += speed;
+            break;
+        case "K":
+            inputTriangles[index].rotation[1] -= speed;
+            break;
+        case ":":
+            inputTriangles[index].rotation[1] += speed;
+            break;
+        case "O":
+            inputTriangles[index].rotation[0] -= speed;
+            break;
+        case "L":
+            inputTriangles[index].rotation[0] += speed;
+            break;
+        case "I":
+            inputTriangles[index].rotation[2] += speed;
+            break;
+        case "P":
+            inputTriangles[index].rotation[2] -= speed;
             break;
     }
 
