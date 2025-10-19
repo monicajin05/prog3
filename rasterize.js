@@ -6,10 +6,12 @@ const WIN_LEFT = 0; const WIN_RIGHT = 1;  // default left and right x coords in 
 const WIN_BOTTOM = 0; const WIN_TOP = 1;  // default top and bottom y coords in world space
 const INPUT_TRIANGLES_URL = "triangles2.json"; // triangles file loc
 const INPUT_ELLIPSOIDS_URL = "https://ncsucgclass.github.io/prog3/ellipsoids.json";
+const CAR_URL = "avocado2.json";
 //const INPUT_SPHERES_URL = "https://ncsucgclass.github.io/prog3/spheres.json"; // spheres file loc
 var Eye = new vec4.fromValues(0.5,0.5,-0.5,1.0); // default eye position in world space
 var LookAt = new vec4.fromValues(0.5, 0.5, 0.5);
 var Up = new vec4.fromValues(0, 1, 0);
+//var Eye2 = new vec4.fromValues(0.5,0.5,-0.5,1.0); // default eye position in world space
 
 /* webgl globals */
 var gl = null; // the all powerful gl object. It's all here folks!
@@ -23,6 +25,7 @@ var inputTriangles;
 var normalBuffer;
 var vertexNormalAttrib;
 var shaderProgram; // create the single shader program
+
 
 // ASSIGNMENT HELPER FUNCTIONS
 
@@ -475,7 +478,7 @@ function render() {
         renderTriangles(); // draw the triangles using webGL
     } else {
         setupWebGL(); // set up the webGL environment
-        loadTriangles(INPUT_ELLIPSOIDS_URL); // load in the triangles from tri file
+        loadTriangles(CAR_URL); // load in the triangles from tri file
         setupShaders(); // setup the webGL shaders
         renderTriangles(); // draw the triangles using webGL
     }
