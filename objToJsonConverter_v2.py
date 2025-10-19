@@ -1,28 +1,5 @@
 import json
 import argparse
-mtllib avocado.mtl
-usemtl Material.001
-
-def load_mtl(mtl_filename):
-    """Reads an MTL file and returns a dict of materials with their colors."""
-    materials = {}
-    current_mat = None
-    try:
-        with open(mtl_filename, 'r') as f:
-            for line in f:
-                parts = line.strip().split()
-                if not parts:
-                    continue
-                if parts[0] == 'newmtl':
-                    current_mat = parts[1]
-                    materials[current_mat] = {}
-                elif parts[0] in ('Ka', 'Kd', 'Ks') and current_mat:
-                    # Ambient, diffuse, specular colors
-                    materials[current_mat][parts[0]] = [float(v) for v in parts[1:4]]
-        return materials
-    except FileNotFoundError:
-        print(f"Warning: MTL file '{mtl_filename}' not found.")
-        return {}
     
 def convert_obj_to_json(obj_filepath, json_filepath):
     """
@@ -111,6 +88,7 @@ def convert_obj_to_json(obj_filepath, json_filepath):
         print(f"Successfully converted '{obj_filepath}' to '{json_filepath}'")
     except Exception as e:
         print(f"An error occurred while writing the JSON file: {e}")
+
 
 
 if __name__ == '__main__':

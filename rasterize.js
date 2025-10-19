@@ -11,6 +11,7 @@ const CAR_URL = "avocado2.json";
 var Eye = new vec4.fromValues(0.5,0.5,-0.5,1.0); // default eye position in world space
 var LookAt = new vec4.fromValues(0.5, 0.5, 0.5);
 var Up = new vec4.fromValues(0, 1, 0);
+let Light = [-0.5, 1.5, -0.5];
 //var Eye2 = new vec4.fromValues(0.5,0.5,-0.5,1.0); // default eye position in world space
 
 /* webgl globals */
@@ -246,7 +247,7 @@ function setupShaders() {
                 gl.enableVertexAttribArray(vertexNormalAttrib);
                
                 // set all the fields that are used in the shaders.
-                gl.uniform3f(gl.getUniformLocation(shaderProgram, "lightPosition"), -0.5, 1.5, -0.5);
+                gl.uniform3f(gl.getUniformLocation(shaderProgram, "lightPosition"), Light[0], Light[1], Light[2]);
                 gl.uniform3f(gl.getUniformLocation(shaderProgram, "eye"), 0.5, 0.5, -0.5);
                 
                 return shaderProgram;
@@ -472,11 +473,17 @@ let currentView = 0;
 
 function render() {
     if (currentView == 0) {
+        Eye = new vec4.fromValues(0.5,0.5,-0.5,1.0);
+        LookAt = vec4.fromValues(0.5, 0.5, 0.5);
+        Light = [-0.5, 1.5, -0.5];
         setupWebGL(); // set up the webGL environment
         loadTriangles(INPUT_TRIANGLES_URL); // load in the triangles from tri file
         setupShaders(); // setup the webGL shaders
         renderTriangles(); // draw the triangles using webGL
     } else {
+        Eye = new vec4.fromValues(-0.5,1.5,5.0,1.0);
+        LookAt = vec4.fromValues(0.0, 1.5, 0.0);
+        Light = [-0.5, 1.5, 0.5];
         setupWebGL(); // set up the webGL environment
         loadTriangles(CAR_URL); // load in the triangles from tri file
         setupShaders(); // setup the webGL shaders
